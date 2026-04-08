@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
 import { AgentPanel } from "./components/AgentPanel";
+import { CommandHeader } from "./components/CommandHeader";
+import { CommandNav } from "./components/CommandNav";
 import { ConsoleFeed } from "./components/ConsoleFeed";
 import { DocumentViewer } from "./components/DocumentViewer";
+import { OverviewStrip } from "./components/OverviewStrip";
+import { TemplateDock } from "./components/TemplateDock";
 import { ValidationBar } from "./components/ValidationBar";
 import { AgentCard, AgentId, CaseRecord, CaseSnapshot, MockDocument, StreamEvent } from "./types";
 
@@ -176,144 +180,90 @@ export default function App() {
     "Pick a seeded procurement case or paste a new submission to watch the live agent workflow kick in.";
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" id="top">
       <div className="ambient ambient-a" />
       <div className="ambient ambient-b" />
       <div className="ambient ambient-c" />
 
-      <header className="hero-bar">
-        <div>
-          <p className="eyebrow">Multi-Agent Command Center</p>
-          <h1>AI Procurement Copilot</h1>
-          <p className="hero-copy">
-            LangGraph-backed procurement triage with streamed agent traces, human review gating, and deterministic mock outputs for a stable demo.
-          </p>
-        </div>
-        <div className="hero-side">
-          <div className="hero-metrics">
-            <MetricChip label="Mode" value="Mocked Agents" />
-            <MetricChip label="State" value="SQLite Checkpoints" />
-            <MetricChip label="Stream" value={streamState} />
-            <MetricChip label="Phase" value={currentSnapshot?.current_phase ?? "standby"} />
-          </div>
-          <article className="hero-focus-card">
-            <p className="eyebrow">Live Focus</p>
-            <strong>{focusTitle}</strong>
-            <p>{focusCopy}</p>
-          </article>
-        </div>
-      </header>
+      <CommandNav
+        activeCaseTitle={currentSnapshot?.title ?? "No case running"}
+        currentPhase={formatPhaseLabel(currentSnapshot?.current_phase ?? "standby")}
+        streamState={streamState}
+      />
 
-      {errorMessage ? <div className="error-banner">{errorMessage}</div> : null}
+      <CommandHeader
+        focusCopy={focusCopy}
+        focusTitle={focusTitle}
+        phase={currentSnapshot?.current_phase ?? "standby"}
+        streamState={streamState}
+      />
 
-      <section className="overview-strip">
-        <article className="overview-chip">
-          <span>Active Case</span>
-          <strong>{currentSnapshot?.title ?? "No case running"}</strong>
-        </article>
-        <article className="overview-chip">
-          <span>Risk Posture</span>
-          <strong>{(currentSnapshot?.risk_level ?? "pending").toUpperCase()}</strong>
-        </article>
-        <article className="overview-chip">
-          <span>Decision State</span>
-          <strong>{formatPhaseLabel(activeCase?.status ?? "standby")}</strong>
-        </article>
-      </section>
+      {errorMessage ? (
+        <aside className="error-banner" aria-live="polite">
+          {errorMessage}
+        </aside>
+      ) : null}
+
+      <OverviewStrip
+        activeCaseTitle={currentSnapshot?.title ?? "No case running"}
+        decisionState={formatPhaseLabel(activeCase?.status ?? "standby")}
+        riskLevel={(currentSnapshot?.risk_level ?? "pending").toUpperCase()}
+      />
 
       <main className="dashboard-grid">
-        <section className="glass-panel intake-column">
+        <section className="glass-panel intake-column" id="intake" aria-labelledby="intake-title">
           <header className="panel-header">
-            <div>
+            <section>
               <p className="eyebrow">Case Intake</p>
-              <h2>Document Dock</h2>
-            </div>
+              <h2 id="intake-title">Document Dock</h2>
+            </section>
             <span className="phase-pill">{activeCase?.status ?? "idle"}</span>
           </header>
 
-          <div className="template-grid">
-            {templates.map((template) => (
-              <button
-                className={`template-card ${selectedTemplateId === template.id ? "template-card--active" : ""}`}
-                key={template.id}
-                onClick={() => applyTemplate(template)}
-                type="button"
-              >
-                <span className="template-card__category">{template.category}</span>
-                <strong>{template.title}</strong>
-                <p>{template.summary}</p>
-              </button>
-            ))}
-          </div>
-
-          <div className="composer-grid">
-            <label className="field">
-              <span>Case Title</span>
-              <input
-                onChange={(event) => setComposerTitle(event.target.value)}
-                placeholder="Paste or rename the procurement case"
-                value={composerTitle}
-              />
-            </label>
-
-            <label className="field field-textarea">
-              <span>Submission</span>
-              <textarea
-                onChange={(event) => setComposerBody(event.target.value)}
-                placeholder="Paste procurement notes, contract language, or an RFP response"
-                value={composerBody}
-              />
-            </label>
-
-            <div className="composer-actions">
-              <button disabled={isSubmitting || !composerBody.trim()} onClick={() => void handleSubmit()} type="button">
-                {isSubmitting ? "Launching..." : "Run Analysis"}
-              </button>
-              <span>Cases start with mocked agent outputs and a real LangGraph pause/resume cycle.</span>
-            </div>
-          </div>
+          <TemplateDock
+            composerBody={composerBody}
+            composerTitle={composerTitle}
+            isSubmitting={isSubmitting}
+            onBodyChange={setComposerBody}
+            onRun={() => void handleSubmit()}
+            onSelectTemplate={applyTemplate}
+            onTitleChange={setComposerTitle}
+            selectedTemplateId={selectedTemplateId}
+            templates={templates}
+          />
 
           <DocumentViewer snapshot={currentSnapshot} />
         </section>
 
-        <section className="glass-panel console-column">
+        <section className="glass-panel console-column" id="console" aria-labelledby="console-title">
           <header className="panel-header">
-            <div>
+            <section>
               <p className="eyebrow">Live Feed</p>
-              <h2>Streaming Console</h2>
-            </div>
+              <h2 id="console-title">Streaming Console</h2>
+            </section>
             <span className={`stream-indicator stream-indicator--${streamState}`}>{streamState}</span>
           </header>
           <ConsoleFeed events={feedEvents} />
         </section>
 
-        <aside className="glass-panel agent-column">
+        <aside className="glass-panel agent-column" id="agents" aria-labelledby="agents-title">
           <header className="panel-header">
-            <div>
+            <section>
               <p className="eyebrow">Agent Lanes</p>
-              <h2>Decision Stack</h2>
-            </div>
+              <h2 id="agents-title">Decision Stack</h2>
+            </section>
             <span className={`risk-badge risk-${currentSnapshot?.risk_level ?? "pending"}`}>{currentSnapshot?.risk_level ?? "pending"}</span>
           </header>
 
-          <div className="agent-stack">
+          <section className="agent-stack" aria-label="Agent activity lanes">
             {agentCards.map((agent) => (
               <AgentPanel agent={agent} key={agent.id} />
             ))}
-          </div>
+          </section>
 
           <ValidationBar onDecision={handleDecision} pending={isValidating} snapshot={currentSnapshot} />
         </aside>
       </main>
-    </div>
-  );
-}
-
-function MetricChip({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="metric-chip">
-      <span>{label}</span>
-      <strong>{value}</strong>
     </div>
   );
 }

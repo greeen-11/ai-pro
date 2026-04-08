@@ -1,0 +1,9 @@
+.venv/
+backend/.venv/
+backend/__pycache__/
+backend/**/*.pyc
+backend/data/*.sqlite
+frontend/node_modules/
+frontend/dist/
+*.log
+Thumbs.db

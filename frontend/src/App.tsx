@@ -6,8 +6,8 @@ import { DocumentViewer } from "./components/DocumentViewer";
 import { ValidationBar } from "./components/ValidationBar";
 import { AgentCard, AgentId, CaseRecord, CaseSnapshot, MockDocument, StreamEvent } from "./types";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
-const WS_BASE = API_BASE.replace(/^http/, "ws");
+const API_BASE = resolveApiBase();
+const WS_BASE = (import.meta.env.VITE_WS_BASE_URL ?? API_BASE).replace(/^http/, "ws");
 const AGENT_ORDER: AgentId[] = ["research", "risk", "decision"];
 
 export default function App() {
@@ -168,6 +168,12 @@ export default function App() {
   }
 
   const currentSnapshot = activeCase?.snapshot ?? null;
+  const focusTitle = resolveFocusTitle(currentSnapshot);
+  const focusCopy =
+    currentSnapshot?.decision_summary ||
+    currentSnapshot?.risk_summary ||
+    currentSnapshot?.research_summary ||
+    "Pick a seeded procurement case or paste a new submission to watch the live agent workflow kick in.";
 
   return (
     <div className="app-shell">
@@ -183,15 +189,37 @@ export default function App() {
             LangGraph-backed procurement triage with streamed agent traces, human review gating, and deterministic mock outputs for a stable demo.
           </p>
         </div>
-        <div className="hero-metrics">
-          <MetricChip label="Mode" value="Mocked Agents" />
-          <MetricChip label="State" value="SQLite Checkpoints" />
-          <MetricChip label="Stream" value={streamState} />
-          <MetricChip label="Phase" value={currentSnapshot?.current_phase ?? "standby"} />
+        <div className="hero-side">
+          <div className="hero-metrics">
+            <MetricChip label="Mode" value="Mocked Agents" />
+            <MetricChip label="State" value="SQLite Checkpoints" />
+            <MetricChip label="Stream" value={streamState} />
+            <MetricChip label="Phase" value={currentSnapshot?.current_phase ?? "standby"} />
+          </div>
+          <article className="hero-focus-card">
+            <p className="eyebrow">Live Focus</p>
+            <strong>{focusTitle}</strong>
+            <p>{focusCopy}</p>
+          </article>
         </div>
       </header>
 
       {errorMessage ? <div className="error-banner">{errorMessage}</div> : null}
+
+      <section className="overview-strip">
+        <article className="overview-chip">
+          <span>Active Case</span>
+          <strong>{currentSnapshot?.title ?? "No case running"}</strong>
+        </article>
+        <article className="overview-chip">
+          <span>Risk Posture</span>
+          <strong>{(currentSnapshot?.risk_level ?? "pending").toUpperCase()}</strong>
+        </article>
+        <article className="overview-chip">
+          <span>Decision State</span>
+          <strong>{formatPhaseLabel(activeCase?.status ?? "standby")}</strong>
+        </article>
+      </section>
 
       <main className="dashboard-grid">
         <section className="glass-panel intake-column">
@@ -395,4 +423,51 @@ function fallbackAgent(agentId: AgentId): AgentCard {
     detail: labels[agentId].detail,
     updated_at: new Date().toISOString(),
   };
+}
+
+function resolveApiBase() {
+  const configuredBase = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (configuredBase) {
+    return configuredBase;
+  }
+
+  if (import.meta.env.DEV && typeof window !== "undefined") {
+    const protocol = window.location.protocol || "http:";
+    const hostname = window.location.hostname || "127.0.0.1";
+    return `${protocol}//${hostname}:8001`;
+  }
+
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+
+  return "http://127.0.0.1:8001";
+}
+
+function resolveFocusTitle(snapshot: CaseSnapshot | null) {
+  if (!snapshot) {
+    return "Ready for intake";
+  }
+
+  if (snapshot.final_status === "awaiting_review") {
+    return "Reviewer handoff is active";
+  }
+
+  if (snapshot.final_status === "approved") {
+    return "Recommendation approved";
+  }
+
+  if (snapshot.final_status === "rejected") {
+    return "Recommendation rejected";
+  }
+
+  return `${formatPhaseLabel(snapshot.current_phase)} in motion`;
+}
+
+function formatPhaseLabel(value: string) {
+  return value
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .join(" ");
 }

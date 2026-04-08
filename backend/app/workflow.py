@@ -384,12 +384,12 @@ class WorkflowService:
         await self._launch(case_id, initial_state)
 
     async def resume_case(self, case_id: str, approved: bool) -> None:
-        case = await self.store.require_case(case_id)
-        if case.snapshot.get("final_status") != "awaiting_review":
-            raise ValueError("Case is not waiting for human review.")
         existing_task = await self.store.get_run_task(case_id)
         if existing_task and not existing_task.done():
             await existing_task
+        case = await self.store.require_case(case_id)
+        if case.snapshot.get("final_status") != "awaiting_review":
+            raise ValueError("Case is not waiting for human review.")
         await self.store.set_status(case_id, "running")
         await self._launch(case_id, Command(resume=approved))
 
